@@ -23,11 +23,12 @@ function Get-CIPPTestResults {
         $CountData = Get-CIPPDbItem -TenantFilter $TenantFilter -CountsOnly
 
         $TenantCounts = @{}
-        $LatestTimestamp = ($CountData | Where-Object { $_.Timestamp } | Measure-Object -Property Timestamp -Maximum).Maximum
+        $LatestTimestamp = $null
 
         foreach ($CountRow in $CountData) {
             $TypeName = $CountRow.RowKey -replace '-Count$', ''
             $TenantCounts[$TypeName] = $CountRow.DataCount
+            $LatestTimestamp = $CountRow.Timestamp
         }
 
         return [PSCustomObject]@{

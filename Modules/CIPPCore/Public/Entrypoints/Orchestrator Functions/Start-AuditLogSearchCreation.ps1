@@ -22,31 +22,6 @@ function Start-AuditLogSearchCreation {
         }
 
         $TenantList = Get-Tenants -IncludeErrors
-        $AuditDisabledTable = Get-CIPPTable -TableName 'AuditLogDisabledTenants'
-        $DisabledAuditRows = @(Get-CIPPAzDataTableEntity @AuditDisabledTable -Filter "PartitionKey eq 'AuditDisabledTenant'")
-        $CurrentUnixTime = [int64]([datetimeoffset]::UtcNow.ToUnixTimeSeconds())
-        $AuditDisabledTenants = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
-        $ExpiredDisabledRows = [System.Collections.Generic.List[object]]::new()
-
-        foreach ($DisabledRow in $DisabledAuditRows) {
-            [int64]$ExpiresAtUnix = 0
-            if (($null -eq $DisabledRow.ExpiresAtUnix) -or (-not [int64]::TryParse([string]$DisabledRow.ExpiresAtUnix, [ref]$ExpiresAtUnix))) {
-                $ExpiredDisabledRows.Add($DisabledRow)
-                continue
-            }
-
-            if ($ExpiresAtUnix -le $CurrentUnixTime) {
-                $ExpiredDisabledRows.Add($DisabledRow)
-                continue
-            }
-
-            [void]$AuditDisabledTenants.Add([string]$DisabledRow.RowKey)
-        }
-
-        if ($ExpiredDisabledRows.Count -gt 0) {
-            Remove-AzDataTableEntity @AuditDisabledTable -Entity $ExpiredDisabledRows -Force | Out-Null
-        }
-
         # Round time down to nearest minute
         $Now = Get-Date
         $StartTime = ($Now.AddSeconds(-$Now.Seconds)).AddHours(-1)
@@ -59,14 +34,7 @@ function Start-AuditLogSearchCreation {
 
         Write-Information "Audit Logs: Building batch for $($TenantList.Count) tenants across $($ConfigEntries.Count) config entries"
 
-        $SkippedAuditDisabledCount = 0
-
         $Batch = foreach ($Tenant in $TenantList) {
-            if ($AuditDisabledTenants.Contains($Tenant.defaultDomainName) -or $AuditDisabledTenants.Contains([string]$Tenant.customerId)) {
-                $SkippedAuditDisabledCount++
-                continue
-            }
-
             $TenantInConfig = $false
             $MatchingConfigs = [System.Collections.Generic.List[object]]::new()
             foreach ($ConfigEntry in $ConfigEntries) {
@@ -92,10 +60,6 @@ function Start-AuditLogSearchCreation {
                     ServiceFilters = @($MatchingConfigs | Select-Object -Property type | Sort-Object -Property type -Unique | ForEach-Object { $_.type.split('.')[1] })
                 }
             }
-        }
-
-        if ($SkippedAuditDisabledCount -gt 0) {
-            Write-Information "Audit Logs: Skipped $SkippedAuditDisabledCount tenants due to cached AuditingDisabledTenant status"
         }
 
         if (($Batch | Measure-Object).Count -gt 0) {

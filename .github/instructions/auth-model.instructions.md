@@ -30,7 +30,7 @@ New-GraphGetRequest / New-ExoRequest / New-TeamsRequest / etc.
         ▼
     Get-GraphToken($tenantid, $scope, $AsApp)
         │
-        ├─ Check process-wide .NET cache: [CIPP.CIPPTokenCache]::Lookup(key, 120)
+        ├─ Check in-memory cache: $script:AccessTokens["{tenantid}-{scope}-{asApp}"]
         │    └─ Hit + not expired → return cached token
         │
         ├─ Determine grant type:
@@ -43,7 +43,7 @@ New-GraphGetRequest / New-ExoRequest / New-TeamsRequest / etc.
         │
         └─ POST to login.microsoftonline.com/{tenantid}/oauth2/v2.0/token
              │
-             └─ Cache result via [CIPP.CIPPTokenCache]::Store(key, json, expiresOn)
+             └─ Cache result in $script:AccessTokens with expires_on
 ```
 
 The `-tenantid` parameter **drives token acquisition**, not just filtering. It determines which customer tenant the token is issued for.
@@ -116,11 +116,10 @@ Customer provides their own refresh token, stored in Key Vault per-tenant (keyed
 
 ## Token caching
 
-Tokens are cached in `[CIPP.CIPPTokenCache]` — a process-wide `ConcurrentDictionary` backed by a static .NET class in `Shared/CIPPSharp/CIPPRestClient.cs`.
+Tokens are cached in `$script:AccessTokens` — a synchronized hashtable keyed by `{tenantid}-{scope}-{asApp}`.
 
-- **Process-wide**: Shared across all runspaces in the worker process (unlike the old `$script:AccessTokens` which was per-runspace)
-- **Cache key**: Built via `[CIPP.CIPPTokenCache]::BuildKey($tenantid, $scope, $asApp, $clientId, $grantType)`
-- **Expiry-aware**: `Lookup()` accepts a buffer (seconds) and returns `$false` for expired or soon-to-expire tokens
+- **Per-runspace**: Not shared across Azure Functions instances
+- **Expiry-aware**: Checks `expires_on` (Unix timestamp) before returning cached token
 - **Auto-refresh**: Expired tokens trigger automatic re-acquisition — no manual refresh needed
 - **Skip cache**: Pass `-SkipCache $true` to force a fresh token (rare, for debugging)
 

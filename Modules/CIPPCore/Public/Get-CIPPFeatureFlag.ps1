@@ -18,7 +18,8 @@ function Get-CIPPFeatureFlag {
 
     try {
         # Get feature flags from JSON
-        $FeatureFlags = [System.IO.File]::ReadAllText((Join-Path $env:CIPPRootPath 'Config\FeatureFlags.json')) | ConvertFrom-Json
+        $FeatureFlagsPath = Join-Path -Path $PSScriptRoot -ChildPath '../lib/data/FeatureFlags.json'
+        $FeatureFlags = Get-Content -Path $FeatureFlagsPath -Raw | ConvertFrom-Json
 
         # Get all table flags once
         $Table = Get-CIPPTable -TableName 'FeatureFlags'

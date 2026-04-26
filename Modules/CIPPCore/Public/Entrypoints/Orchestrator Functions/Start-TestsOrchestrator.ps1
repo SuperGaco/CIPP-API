@@ -7,22 +7,10 @@ function Start-TestsOrchestrator {
     Entrypoint
     #>
     [CmdletBinding(SupportsShouldProcess = $true)]
-    param(
-        [Parameter(Mandatory = $false)]
-        [string]$TenantFilter = 'allTenants',
+    param()
 
-        [Parameter(Mandatory = $false)]
-        [switch]$Force
-    )
-
-    if ($PSCmdlet.ShouldProcess('Start-TestsOrchestrator', "Starting Tests Orchestrator for $TenantFilter")) {
-        try {
-            Write-LogMessage -API 'Tests' -tenant $TenantFilter -message 'Starting Tests Schedule' -sev Info
-            return Start-CIPPDBTestsRun -TenantFilter $TenantFilter -Force:$Force
-        } catch {
-            $ErrorMessage = Get-CippException -Exception $_
-            Write-LogMessage -API 'Tests' -tenant $TenantFilter -message "Failed to start tests orchestrator: $($ErrorMessage.NormalizedError)" -sev Error -LogData $ErrorMessage
-            throw
-        }
+    if ($PSCmdlet.ShouldProcess('Start-TestsOrchestrator', 'Starting Tests Orchestrator')) {
+        Write-LogMessage -API 'Tests' -message 'Starting Tests Schedule' -sev Info
+        Invoke-CIPPDBTestsRun -TenantFilter 'allTenants'
     }
 }
