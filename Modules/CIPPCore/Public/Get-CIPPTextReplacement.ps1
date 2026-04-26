@@ -20,11 +20,6 @@ function Get-CIPPTextReplacement {
         return $Text
     }
 
-    # Without a tenant context, skip replacement lookups and return input as-is.
-    if ([string]::IsNullOrWhiteSpace($TenantFilter)) {
-        return $Text
-    }
-
     $ReservedVariables = @(
         '%serial%',
         '%systemroot%',
@@ -49,12 +44,8 @@ function Get-CIPPTextReplacement {
         '%organizationid%'
     )
 
-    if ($TenantFilter -ne $env:TenantID) {
-        $Tenant = Get-Tenants -TenantFilter $TenantFilter
-        $CustomerId = $Tenant.customerId
-    } else {
-        $CustomerId = $TenantFilter
-    }
+    $Tenant = Get-Tenants -TenantFilter $TenantFilter
+    $CustomerId = $Tenant.customerId
 
     #connect to table, get replacement map. The replacement map will allow users to create custom vars that get replaced by the actual values per tenant. Example:
     # %WallPaperPath% gets replaced by RowKey WallPaperPath which is set to C:\Wallpapers for tenant 1, and D:\Wallpapers for tenant 2

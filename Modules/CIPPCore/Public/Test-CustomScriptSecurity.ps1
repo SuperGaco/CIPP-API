@@ -59,7 +59,7 @@ function Test-CustomScriptSecurity {
         'ConvertTo-Json', 'ConvertFrom-Json', 'Write-Output', 'Write-Host',
 
         # CIPP data access (read-only)
-        'New-CIPPDbRequest', 'Get-CIPPDbItem', 'Get-CIPPTestData'
+        'New-CIPPDbRequest', 'Get-CIPPDbItem'
     )
 
     # Find all command invocations (exclude hashtable key assignments and property access)

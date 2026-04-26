@@ -2,7 +2,9 @@
 # This block is only used when running from source (not built)
 if (Test-Path (Join-Path $PSScriptRoot 'Public')) {
     $Public = @(Get-ChildItem -Path (Join-Path $PSScriptRoot 'Public\*.ps1') -Recurse -ErrorAction SilentlyContinue)
-    foreach ($import in @($Public)) {
+    $Private = @(Get-ChildItem -Path (Join-Path $PSScriptRoot 'Private\*.ps1') -Recurse -ErrorAction SilentlyContinue)
+    $Functions = $Public + $Private
+    foreach ($import in @($Functions)) {
         try {
             . $import.FullName
         } catch {

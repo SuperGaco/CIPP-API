@@ -58,6 +58,25 @@ function New-passwordString {
         return [System.Security.Cryptography.RandomNumberGenerator]::GetInt32($Minimum, $Maximum)
     }
 
+    function Get-SafeWordsPath {
+        # Try multiple path resolution methods for better reliability
+        $possiblePaths = @()
+
+        if ($env:AzureWebJobsScriptRoot) {
+            $possiblePaths += Join-Path $env:AzureWebJobsScriptRoot 'words.txt'
+        }
+        $possiblePaths += Join-Path $PSScriptRoot '..\..\..\..\words.txt'
+        $possiblePaths += Join-Path $PSScriptRoot '..\..\..\..\..\words.txt'
+
+        foreach ($path in $possiblePaths) {
+            if ($path -and (Test-Path $path)) {
+                return $path
+            }
+        }
+
+        throw "Passphrase word list (words.txt) not found in any expected location"
+    }
+
     # Microsoft 365 compliance validation
     function Test-Microsoft365Compliance {
         param(
@@ -119,7 +138,12 @@ function New-passwordString {
             throw "Word count must be between 2 and 10 for passphrase generation"
         }
 
-        $Words = @(Get-Content (Join-Path $env:CIPPRootPath 'words.txt') -Encoding UTF8 | Where-Object { $_.Length -gt 0 -and $_ -match '^[a-zA-Z]+$' })
+        # Get words file path with better error handling
+        $WordsPath = Get-SafeWordsPath
+        $Words = @(Get-Content $WordsPath -Encoding UTF8 | Where-Object { $_.Length -gt 0 -and $_ -match '^[a-zA-Z]+$' })
+        if ($Words.Count -lt $WordCount) {
+            throw "Passphrase word list has insufficient entries ($($Words.Count) words, need at least $WordCount)"
+        }
         $wordPool = [System.Collections.Generic.List[string]]::new()
         $Words | ForEach-Object { $wordPool.Add($_) }
         $SelectedWords = @(1..$WordCount | ForEach-Object {

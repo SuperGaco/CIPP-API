@@ -43,7 +43,9 @@ function Initialize-CIPPExcludedLicenses {
         }
 
         # Get the config file path
-        $ConfigPath = Join-Path $env:CIPPRootPath 'Config\ExcludeSkuList.JSON'
+        $CIPPCoreModuleRoot = Get-Module -Name CIPPCore | Select-Object -ExpandProperty ModuleBase
+        $CIPPRoot = (Get-Item $CIPPCoreModuleRoot).Parent.Parent
+        $ConfigPath = Join-Path $CIPPRoot 'Config\ExcludeSkuList.JSON'
 
         if (-not (Test-Path $ConfigPath)) {
             throw "Config file not found: $ConfigPath"

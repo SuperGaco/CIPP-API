@@ -12,16 +12,19 @@ function Test-CIPPAccess {
     $FunctionName = 'Invoke-{0}' -f $Request.Params.CIPPEndpoint
 
     $SwPermissions = [System.Diagnostics.Stopwatch]::StartNew()
-    if (-not $script:CIPPFunctionPermissions) {
-        if ($global:CIPPFunctionPermissions) {
-            $script:CIPPFunctionPermissions = $global:CIPPFunctionPermissions
-        } else {
-            $PermissionsFileJson = Join-Path $env:CIPPRootPath 'Config\function-permissions.json'
+    if (-not $global:CIPPFunctionPermissions) {
+        $CIPPCoreModule = Get-Module -Name CIPPCore
+        if ($CIPPCoreModule) {
+            $PermissionsFileJson = Join-Path $CIPPCoreModule.ModuleBase 'lib' 'data' 'function-permissions.json'
 
             if (Test-Path $PermissionsFileJson) {
                 try {
-                    $script:CIPPFunctionPermissions = [System.IO.File]::ReadAllText($PermissionsFileJson) | ConvertFrom-Json -AsHashtable
-                    Write-Debug "Loaded $($script:CIPPFunctionPermissions.Count) function permissions from JSON cache"
+                    $jsonData = Get-Content -Path $PermissionsFileJson -Raw | ConvertFrom-Json -AsHashtable
+                    $global:CIPPFunctionPermissions = [System.Collections.Hashtable]::new([StringComparer]::OrdinalIgnoreCase)
+                    foreach ($key in $jsonData.Keys) {
+                        $global:CIPPFunctionPermissions[$key] = $jsonData[$key]
+                    }
+                    Write-Debug "Loaded $($global:CIPPFunctionPermissions.Count) function permissions from JSON cache"
                 } catch {
                     Write-Warning "Failed to load function permissions from JSON: $($_.Exception.Message)"
                 }
@@ -33,8 +36,8 @@ function Test-CIPPAccess {
 
     if ($FunctionName -ne 'Invoke-me') {
         $swHelp = [System.Diagnostics.Stopwatch]::StartNew()
-        if ($script:CIPPFunctionPermissions -and $script:CIPPFunctionPermissions.ContainsKey($FunctionName)) {
-            $PermissionData = $script:CIPPFunctionPermissions[$FunctionName]
+        if ($global:CIPPFunctionPermissions -and $global:CIPPFunctionPermissions.ContainsKey($FunctionName)) {
+            $PermissionData = $global:CIPPFunctionPermissions[$FunctionName]
             $APIRole = $PermissionData['Role']
             $Functionality = $PermissionData['Functionality']
             Write-Debug "Loaded function permission data from cache for '$FunctionName': Role='$APIRole', Functionality='$Functionality'"
@@ -52,11 +55,11 @@ function Test-CIPPAccess {
         $AccessTimings['GetHelp'] = $swHelp.Elapsed.TotalMilliseconds
     }
 
-    # Get default roles from config (cache per runspace for performance)
+    # Get default roles from config
     $swRolesLoad = [System.Diagnostics.Stopwatch]::StartNew()
-    if (-not $script:CIPPBaseRoles) {
-        $script:CIPPBaseRoles = [System.IO.File]::ReadAllText((Join-Path $env:CIPPRootPath 'Config\cipp-roles.json')) | ConvertFrom-Json
-    }
+    $CIPPCoreModuleRoot = Get-Module -Name CIPPCore | Select-Object -ExpandProperty ModuleBase
+    $CIPPRoot = (Get-Item $CIPPCoreModuleRoot).Parent.Parent
+    $BaseRoles = Get-Content -Path $CIPPRoot\Config\cipp-roles.json | ConvertFrom-Json
     $swRolesLoad.Stop()
     $AccessTimings['LoadBaseRoles'] = $swRolesLoad.Elapsed.TotalMilliseconds
     $DefaultRoles = @('superadmin', 'admin', 'editor', 'readonly', 'anonymous', 'authenticated')
@@ -96,7 +99,7 @@ function Test-CIPPAccess {
                         }
                     }
                     $BaseRole = $null
-                    foreach ($Role in $script:CIPPBaseRoles.PSObject.Properties) {
+                    foreach ($Role in $BaseRoles.PSObject.Properties) {
                         foreach ($ClientRole in $Client.Role) {
                             if ($Role.Name -eq $ClientRole) {
                                 $BaseRole = $Role
@@ -231,7 +234,7 @@ function Test-CIPPAccess {
         } elseif ($User.userRoles -contains 'admin') {
             $User.userRoles = @('admin')
         }
-        foreach ($Role in $script:CIPPBaseRoles.PSObject.Properties) {
+        foreach ($Role in $BaseRoles.PSObject.Properties) {
             foreach ($UserRole in $User.userRoles) {
                 if ($Role.Name -eq $UserRole) {
                     $BaseRole = $Role

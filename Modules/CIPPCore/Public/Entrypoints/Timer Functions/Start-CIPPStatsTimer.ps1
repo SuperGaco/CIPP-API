@@ -15,18 +15,16 @@ function Start-CIPPStatsTimer {
         $TenantCount = (Get-Tenants -IncludeAll).count
 
 
-        $APIVersion = Get-Content (Join-Path $env:CIPPRootPath 'version_latest.txt') | Out-String
+        $ModuleBase = Get-Module CIPPCore | Select-Object -ExpandProperty ModuleBase
+        $CIPPRoot = (Get-Item $ModuleBase).Parent.Parent.FullName
+
+        $APIVersion = Get-Content "$CIPPRoot\version_latest.txt" | Out-String
         $Table = Get-CIPPTable -TableName Extensionsconfig
         try {
             $RawExt = (Get-CIPPAzDataTableEntity @Table).config | ConvertFrom-Json -Depth 10 -ErrorAction Stop
         } catch {
             $RawExt = @{}
         }
-
-        $ConfigTable = Get-CIPPTable -tablename 'Config'
-        $FunctionOffloading = (Get-CIPPAzDataTableEntity @ConfigTable -Filter "RowKey eq 'OffloadFunctions' and PartitionKey eq 'OffloadFunctions'").state
-        $OffloadingEnabled = $false
-        [bool]::TryParse($FunctionOffloading, [ref]$OffloadingEnabled) | Out-Null
 
         # Get counts of various entities across all tenants
         $counts = Get-CIPPDbItem -TenantFilter AllTenants -CountsOnly
@@ -39,8 +37,6 @@ function Start-CIPPStatsTimer {
         $SendingObject = [PSCustomObject]@{
             rgid                = $env:WEBSITE_SITE_NAME
             SetupComplete       = $SetupComplete
-            Hosted              = $env:CIPP_HOSTED -eq 'true'
-            OffloadingEnabled   = $OffloadingEnabled
             RunningVersionAPI   = $APIVersion.trim()
             CountOfTotalTenants = $TenantCount
             uid                 = $env:TenantID
@@ -60,13 +56,12 @@ function Start-CIPPStatsTimer {
             CFZTNA              = $RawExt.CFZTNA.Enabled
             GitHub              = $RawExt.GitHub.Enabled
         } | ConvertTo-Json
-
         try {
-            Invoke-CIPPRestMethod -Uri 'https://management.cipp.app/api/stats' -Method POST -Body $SendingObject -ContentType 'application/json'
+            Invoke-RestMethod -Uri 'https://management.cipp.app/api/stats' -Method POST -Body $SendingObject -ContentType 'application/json'
         } catch {
             $rand = Get-Random -Minimum 0.5 -Maximum 5.5
             Start-Sleep -Seconds $rand
-            Invoke-CIPPRestMethod -Uri 'https://management.cipp.app/api/stats' -Method POST -Body $SendingObject -ContentType 'application/json'
+            Invoke-RestMethod -Uri 'https://management.cipp.app/api/stats' -Method POST -Body $SendingObject -ContentType 'application/json'
         }
     }
 }

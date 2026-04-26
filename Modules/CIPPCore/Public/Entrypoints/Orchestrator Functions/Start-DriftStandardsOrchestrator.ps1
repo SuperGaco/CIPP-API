@@ -11,6 +11,6 @@ function Start-DriftStandardsOrchestrator {
 
     if ($PSCmdlet.ShouldProcess('Start-DriftStandardsOrchestrator', 'Starting Drift Standards Orchestrator')) {
         Write-LogMessage -API 'Standards' -message 'Starting Drift Standards Schedule' -sev Info
-        New-CIPPStandardsRun -Drift
+        Invoke-CIPPStandardsRun -Drift
     }
 }
